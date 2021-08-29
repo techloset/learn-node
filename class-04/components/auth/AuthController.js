@@ -1,18 +1,30 @@
 var authModel = require("./AuthModel");
+var bycrypt = require("bcryptjs")
 var jwt = require("jsonwebtoken");
 
-module.exports.signup = (req, res) => {
+module.exports.signup = async(req, res) => {
   console.log("req body", req.body);
   const { name, createdAt, email, password } = req.body;
 
   if (!name || !createdAt || !email || !password) {
     res.status(400).send("All params are required");
   }
+
+  const user = await authModel.findOne({ email: email });
+
+  if(user){
+    res.status(400).send("user email already exist");
+  }
+
+  const encryptedPassword = await bycrypt.hash(password, 10);
+  
+  console.log("encryptedPassword", encryptedPassword)
+
   const newUser = new authModel({
     name,
     createdAt,
     email,
-    password,
+    password: encryptedPassword,
   });
   newUser.save((err, success) => {
     //token create?
@@ -31,11 +43,12 @@ module.exports.login = async (req, res) => {
     res.status(400).send("All params are required");
   }
 
+
   const user = await authModel.findOne({ email: email });
   console.log("user", user);
   if (!user) {
     res.status(401).send("user email not found");
-  } else if (user.password !== password) {
+  } else if (!await bycrypt.compare(password, user.password)) {
     res.status(401).send("Your password is not correct");
   }
   var token = await jwt.sign(
